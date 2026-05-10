@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src *; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src *;">
+<title>EMA Backtest</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#060810;--bg2:#0c0f1a;--bg3:#111827;--border:#1a2030;--border2:#243044;--text:#e8eaf0;--muted:#4a5568;--muted2:#2d3748;--long:#00e5a0;--long-dim:#003d2a;--short:#ff4560;--short-dim:#3d0018;--warn:#f59e0b;--warn-dim:#3d2800;--mono:'Space Mono',monospace;--sans:'Syne',sans-serif;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,160,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,160,0.02) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0;}
+.app{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:24px 16px 60px;}
+.header{margin-bottom:24px;border-bottom:1px solid var(--border);padding-bottom:20px;}
+.brand{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.brand-title{font-size:28px;font-weight:800;color:#fff;letter-spacing:-0.5px;}
+.brand-title span{color:var(--warn);}
+.brand-sub{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:0.1em;margin-top:4px;}
+.version-badge{font-family:var(--mono);font-size:10px;padding:4px 12px;border-radius:4px;background:var(--warn-dim);color:var(--warn);border:1px solid var(--warn);}
+.section{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:14px;}
+.section-title{font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;align-items:end;}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:end;}
+.field{display:flex;flex-direction:column;gap:6px;}
+.field-label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:0.05em;}
+.field input,.field select{font-family:var(--mono);font-size:12px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);outline:none;transition:border-color 0.2s;width:100%;}
+.field input:focus,.field select:focus{border-color:var(--warn);}
+.field select option{background:var(--bg3);}
+.divider{height:1px;background:var(--border);margin:14px 0;}
+.run-btn{font-family:var(--sans);font-size:13px;font-weight:700;padding:10px 24px;border-radius:6px;border:none;background:var(--warn);color:#000;cursor:pointer;white-space:nowrap;height:40px;transition:all 0.15s;}
+.run-btn:hover{background:#d97706;}
+.run-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.preset-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;}
+.preset-btn{font-family:var(--mono);font-size:10px;padding:5px 12px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;}
+.preset-btn:hover{border-color:var(--warn);color:var(--warn);}
+.save-btn{font-family:var(--mono);font-size:11px;padding:10px 18px;border-radius:6px;border:1px solid var(--long);background:var(--long-dim);color:var(--long);cursor:pointer;height:40px;transition:all 0.15s;}
+.save-btn:hover{background:var(--long);color:#000;}
+.next-run{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:12px;padding:10px 14px;background:var(--bg3);border-radius:6px;border:1px solid var(--border);}
+.next-run strong{color:var(--warn);}
+.progress-wrap{height:3px;background:var(--border);border-radius:99px;margin-bottom:8px;overflow:hidden;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--warn),var(--long));border-radius:99px;transition:width 0.4s;width:0%;}
+.status-bar{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:16px;min-height:16px;}
+.status-bar strong{color:var(--warn);}
+.status-bar .ok{color:var(--long);}
+.sg{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;}
+.sc{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;position:relative;overflow:hidden;}
+.sc::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--border);}
+.sc.al::after{background:var(--long);}
+.sc.as::after{background:var(--short);}
+.sc.aw::after{background:var(--warn);}
+.sl{font-family:var(--mono);font-size:9px;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;margin-bottom:8px;}
+.sv{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--text);}
+.sv.cl{color:var(--long);}
+.sv.cs{color:var(--short);}
+.sv.cw{color:var(--warn);}
+.ss{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;}
+.tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:16px;}
+.tab{font-family:var(--mono);font-size:11px;padding:10px 18px;cursor:pointer;border:none;background:transparent;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--warn);border-bottom-color:var(--warn);}
+.tw{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px;}
+table{width:100%;border-collapse:collapse;font-size:11px;}
+th{padding:9px 12px;text-align:center;font-family:var(--mono);font-size:9px;font-weight:400;color:var(--muted);background:var(--bg);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:0.08em;}
+td{padding:10px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);color:var(--text);vertical-align:middle;text-align:center;}
+td:first-child,td:nth-child(2){text-align:left;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#0f1420;}
+.sym{font-weight:700;font-size:13px;color:#fff;}
+.wr td{background:rgba(0,229,160,0.03);}
+.lr td{background:rgba(255,69,96,0.03);}
+.badge{font-size:9px;padding:2px 7px;border-radius:3px;font-weight:700;}
+.bw{background:var(--long-dim);color:var(--long);border:1px solid #005c38;}
+.bl{background:var(--short-dim);color:var(--short);border:1px solid #660020;}
+.bo{background:var(--warn-dim);color:var(--warn);border:1px solid #6b4400;}
+.bdl{background:var(--long-dim);color:var(--long);border:1px solid #005c38;}
+.bds{background:var(--short-dim);color:var(--short);border:1px solid #660020;}
+.bg{background:var(--long-dim);color:var(--long);border:1px solid #005c38;}
+.by{background:var(--warn-dim);color:var(--warn);border:1px solid #6b4400;}
+.br{background:var(--short-dim);color:var(--short);border:1px solid #660020;}
+.pp{color:var(--long);}
+.pn{color:var(--short);}
+.syg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.syc{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;}
+.syn{font-size:15px;font-weight:800;color:#fff;margin-bottom:8px;}
+.sys{font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.9;}
+.sys .hl{color:var(--text);}.sys .lg{color:var(--long);}.sys .sh{color:var(--short);}.sys .wn{color:var(--warn);}
+.eq-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:14px;}
+canvas{width:100%;height:140px;display:block;}
+.empty{text-align:center;padding:50px 20px;color:var(--muted);}
+.empty-icon{font-size:36px;margin-bottom:10px;opacity:0.4;}
+.empty-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;}
+.empty-sub{font-family:var(--mono);font-size:11px;line-height:1.7;}
+.spin{animation:spin 1s linear infinite;display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Token Browser Layout */
+.token-browser{display:grid;grid-template-columns:220px 1fr;gap:14px;min-height:400px;}
+.token-list{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;}
+.token-list-header{font-family:var(--mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);padding:12px 14px;border-bottom:1px solid var(--border);background:var(--bg);}
+.token-list-search{padding:8px 10px;border-bottom:1px solid var(--border);}
+.token-list-search input{width:100%;font-family:var(--mono);font-size:11px;padding:6px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text);outline:none;}
+.token-list-search input:focus{border-color:var(--warn);}
+.token-scroll{overflow-y:auto;flex:1;max-height:500px;}
+.token-item{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background 0.15s;}
+.token-item:hover{background:var(--bg3);}
+.token-item.active{background:var(--warn-dim);border-left:2px solid var(--warn);}
+.token-item-name{font-family:var(--sans);font-size:13px;font-weight:700;color:#fff;}
+.token-item-sub{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px;}
+.token-item-wr{font-family:var(--mono);font-size:10px;font-weight:700;}
+.token-detail{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;overflow:hidden;}
+.token-detail-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
+.token-detail-name{font-size:22px;font-weight:800;color:#fff;}
+.token-detail-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;}
+.tds{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px 12px;}
+.tds-label{font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;}
+.tds-value{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--text);}
+.token-equity{width:100%;height:100px;display:block;margin-bottom:12px;}
+@media(max-width:700px){
+  .g4{grid-template-columns:1fr 1fr;}.g3{grid-template-columns:1fr 1fr;}
+  .sg{grid-template-columns:repeat(2,1fr);}.syg{grid-template-columns:repeat(2,1fr);}
+  .token-browser{grid-template-columns:1fr;}.token-scroll{max-height:200px;}
+  .token-detail-stats{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="header">
+  <div class="brand">
+    <div>
+      <div class="brand-title">EMA <span>Backtest</span></div>
+      <div class="brand-sub">ACCURATE HISTORICAL · 4H+1H+15M · TRADE SIMULATION · BYBIT</div>
+    </div>
+    <div class="version-badge">WEEKLY SCANNER</div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">⚙ Backtest Settings</div>
+  <div class="g4">
+    <div class="field"><label class="field-label">FROM DATE</label><input type="date" id="date-from"></div>
+    <div class="field"><label class="field-label">TO DATE</label><input type="date" id="date-to"></div>
+    <div class="field"><label class="field-label">TOP N SYMBOLS</label>
+      <select id="top-n">
+        <option value="10">Top 10</option>
+        <option value="20">Top 20</option>
+        <option value="30" selected>Top 30</option>
+        <option value="50">Top 50</option>
+      </select>
+    </div>
+    <button class="run-btn" id="run-btn" onclick="runBacktest()">▶ Run Backtest</button>
+  </div>
+  <div class="preset-row">
+    <span style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:4px;">Quick:</span>
+    <button class="preset-btn" onclick="setPreset(7)">Last 7 days</button>
+    <button class="preset-btn" onclick="setPreset(14)">Last 14 days</button>
+    <button class="preset-btn" onclick="setPreset(30)">Last 30 days</button>
+  </div>
+  <div class="divider"></div>
+  <div class="section-title">💰 Simulation Settings</div>
+  <div class="g4">
+    <div class="field"><label class="field-label">STARTING CAPITAL ($)</label><input type="number" id="capital" value="100" min="1" step="10"></div>
+    <div class="field"><label class="field-label">RISK PER TRADE ($)</label><input type="number" id="risk-usd" value="2" min="0.5" step="0.5"></div>
+    <div class="field"><label class="field-label">TAKE PROFIT R:R</label>
+      <select id="tp-rr">
+        <option value="1.0">1:1</option>
+        <option value="1.25">1:1.25</option>
+        <option value="1.5" selected>1:1.5</option>
+        <option value="2.0">1:2</option>
+        <option value="3.0">1:3</option>
+      </select>
+    </div>
+    <div class="field"><label class="field-label">MAX HOLD TIME</label>
+      <select id="sim-candles">
+        <option value="32">8 hours</option>
+        <option value="64">16 hours</option>
+        <option value="96" selected>24 hours</option>
+        <option value="192">48 hours</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">📅 Weekly Auto Schedule</div>
+  <div class="g3">
+    <div class="field"><label class="field-label">RUN EVERY</label>
+      <select id="sched-day">
+        <option value="0">Sunday</option><option value="1">Monday</option>
+        <option value="2" selected>Tuesday</option><option value="3">Wednesday</option>
+        <option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
+      </select>
+    </div>
+    <div class="field"><label class="field-label">AT TIME</label><input type="time" id="sched-time" value="09:00"></div>
+    <button class="save-btn" onclick="saveSchedule()">💾 Save Schedule</button>
+  </div>
+  <div class="next-run" id="next-run-label">No schedule saved yet.</div>
+</div>
+
+<div class="progress-wrap"><div class="progress-fill" id="prog"></div></div>
+<div class="status-bar" id="status">Set a date range and press <strong>Run Backtest</strong> to start.</div>
+
+<div class="sg">
+  <div class="sc aw"><div class="sl">Total Signals</div><div class="sv cw" id="sv-total">—</div><div class="ss" id="ss-total">awaiting scan</div></div>
+  <div class="sc al"><div class="sl">Long Signals</div><div class="sv cl" id="sv-long">—</div><div class="ss">4H+1H uptrend</div></div>
+  <div class="sc as"><div class="sl">Short Signals</div><div class="sv cs" id="sv-short">—</div><div class="ss">4H+1H downtrend</div></div>
+  <div class="sc"><div class="sl">Symbols Hit</div><div class="sv" id="sv-syms">—</div><div class="ss" id="ss-syms">unique tokens</div></div>
+</div>
+<div class="sg">
+  <div class="sc"><div class="sl">🟢 EMA20 Hits</div><div class="sv cl" id="sv-g">—</div><div class="ss">strongest</div></div>
+  <div class="sc"><div class="sl">🟡 EMA50 Hits</div><div class="sv cw" id="sv-y">—</div><div class="ss">medium</div></div>
+  <div class="sc"><div class="sl">🔴 EMA100 Hits</div><div class="sv cs" id="sv-r">—</div><div class="ss">deep</div></div>
+  <div class="sc"><div class="sl">Date Range</div><div class="sv" id="sv-days" style="font-size:18px;">—</div><div class="ss" id="ss-days">days</div></div>
+</div>
+
+<div id="sim-section" style="display:none;">
+  <div class="section-title" style="font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">📈 Trade Simulation Results</div>
+  <div class="sg">
+    <div class="sc al"><div class="sl">Win Rate</div><div class="sv cl" id="sv-winrate">—</div><div class="ss" id="ss-winrate">wins / closed</div></div>
+    <div class="sc"><div class="sl">Net P&L</div><div class="sv" id="sv-pnl">—</div><div class="ss" id="ss-pnl">total</div></div>
+    <div class="sc aw"><div class="sl">Final Capital</div><div class="sv cw" id="sv-capital">—</div><div class="ss" id="ss-capital">started with</div></div>
+    <div class="sc"><div class="sl">Avg Per Trade</div><div class="sv" id="sv-avg">—</div><div class="ss" id="ss-avg">per signal</div></div>
+  </div>
+  <div class="eq-wrap">
+    <div class="section-title">📊 Equity Curve</div>
+    <canvas id="eq-canvas"></canvas>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('signals',this)">All Signals</button>
+  <button class="tab" onclick="switchTab('symbols',this)">By Symbol</button>
+  <button class="tab" onclick="switchTab('long',this)">Longs</button>
+  <button class="tab" onclick="switchTab('short',this)">Shorts</button>
+</div>
+<div id="results-area">
+  <div class="empty"><div class="empty-icon">📊</div><div class="empty-title">No backtest run yet</div><div class="empty-sub">Set your date range and press Run.<br>Uses real historical 4H+1H trend data for accurate results.</div></div>
+</div>
+
+</div>
+<script>
+const BASES=['https://api.bybit.com','https://api.bytick.com'];
+const THRESHOLD=1.0,CHOP_SPREAD=0.2,SL_BUF=0.002;
+let allSignals=[],running=false,currentTab='signals';
+
+(function init(){
+  const t=new Date(),p=new Date();
+  p.setDate(t.getDate()-7);
+  document.getElementById('date-to').value=t.toISOString().split('T')[0];
+  document.getElementById('date-from').value=p.toISOString().split('T')[0];
+  loadSchedule();
+})();
+
+function setPreset(d){
+  const t=new Date(),p=new Date();
+  p.setDate(t.getDate()-d);
+  document.getElementById('date-to').value=t.toISOString().split('T')[0];
+  document.getElementById('date-from').value=p.toISOString().split('T')[0];
+}
+
+function saveSchedule(){
+  localStorage.setItem('bt_day',document.getElementById('sched-day').value);
+  localStorage.setItem('bt_time',document.getElementById('sched-time').value);
+  updateNextRun();alert('✅ Schedule saved!');
+}
+function loadSchedule(){
+  const d=localStorage.getItem('bt_day'),t=localStorage.getItem('bt_time');
+  if(d)document.getElementById('sched-day').value=d;
+  if(t)document.getElementById('sched-time').value=t;
+  updateNextRun();checkAutoRun();
+}
+function updateNextRun(){
+  const day=parseInt(document.getElementById('sched-day').value);
+  const time=document.getElementById('sched-time').value;
+  if(!time)return;
+  const DN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const now=new Date(),next=new Date();
+  next.setHours(parseInt(time.split(':')[0]),parseInt(time.split(':')[1]),0,0);
+  const diff=(day-now.getDay()+7)%7;
+  next.setDate(now.getDate()+(diff===0&&next<=now?7:diff));
+  document.getElementById('next-run-label').innerHTML=`Next auto-run: <strong>${DN[day]} at ${time}</strong> — ${next.toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'})}`;
+}
+function checkAutoRun(){
+  const day=localStorage.getItem('bt_day'),time=localStorage.getItem('bt_time');
+  if(!day||!time)return;
+  const now=new Date(),[sh,sm]=time.split(':').map(Number);
+  if(now.getDay()===parseInt(day)&&now.getHours()===sh&&now.getMinutes()>=sm&&now.getMinutes()<=sm+30){setPreset(7);setTimeout(()=>runBacktest(),1500);}
+}
+
+function calcEMA(p,n){const k=2/(n+1),r=[p[0]];for(let i=1;i<p.length;i++)r.push(p[i]*k+r[i-1]*(1-k));return r;}
+
+function trendAt(closes,endIdx){
+  const w=closes.slice(Math.max(0,endIdx-199),endIdx+1);
+  if(w.length<110)return'unknown';
+  const e20=calcEMA(w,20),e50=calcEMA(w,50),e100=calcEMA(w,100);
+  const v20=e20[e20.length-1],v50=e50[e50.length-1],v100=e100[e100.length-1];
+  if(Math.abs(v20-v50)/v50*100<CHOP_SPREAD&&Math.abs(v50-v100)/v100*100<CHOP_SPREAD)return'chop';
+  if(v20>v50&&v50>v100)return'uptrend';
+  if(v20<v50&&v50<v100)return'downtrend';
+  return'chop';
+}
+
+function entryAt(closes,endIdx,dir){
+  const w=closes.slice(Math.max(0,endIdx-199),endIdx+1);
+  if(w.length<110)return null;
+  const e20=calcEMA(w,20),e50=calcEMA(w,50),e100=calcEMA(w,100);
+  const price=w[w.length-1],v20=e20[e20.length-1],v50=e50[e50.length-1],v100=e100[e100.length-1];
+  if(dir==='long'){
+    if(!(v20>v50&&v50>v100))return null;
+    if(price>v20){const d=(price-v20)/v20*100;if(d<=THRESHOLD)return{level:'green',dist:d,v20,v50,v100};}
+    if(price>v50&&price<=v20){const d=Math.abs(price-v50)/v50*100;if(d<=THRESHOLD)return{level:'yellow',dist:d,v20,v50,v100};}
+    if(price>v100&&price<=v50){const d=Math.abs(price-v100)/v100*100;if(d<=THRESHOLD)return{level:'red',dist:d,v20,v50,v100};}
+  }
+  if(dir==='short'){
+    if(!(v20<v50&&v50<v100))return null;
+    if(price<v20){const d=(v20-price)/v20*100;if(d<=THRESHOLD)return{level:'green',dist:d,v20,v50,v100};}
+    if(price<v50&&price>=v20){const d=Math.abs(price-v50)/v50*100;if(d<=THRESHOLD)return{level:'yellow',dist:d,v20,v50,v100};}
+    if(price<v100&&price>=v50){const d=Math.abs(price-v100)/v100*100;if(d<=THRESHOLD)return{level:'red',dist:d,v20,v50,v100};}
+  }
+  return null;
+}
+
+function simulate(c,hi,lo,idx,e,dir,risk,tpRR,maxC){
+  const price=c[idx];
+  let sl;
+  if(dir==='long'){sl=e.level==='green'?e.v50*(1-SL_BUF):e.level==='yellow'?e.v100*(1-SL_BUF):e.v100*(1-0.015);}
+  else{sl=e.level==='green'?e.v50*(1+SL_BUF):e.level==='yellow'?e.v100*(1+SL_BUF):e.v100*(1+0.015);}
+  const slPct=Math.abs(price-sl)/price*100;
+  const tp=dir==='long'?price*(1+(slPct/100)*tpRR):price*(1-(slPct/100)*tpRR);
+  const tpPct=Math.abs(tp-price)/price*100;
+  const sz=Math.round(risk/(slPct/100));
+  const rew=risk*tpRR;
+  let result='open',exitPrice=null,exitC=0;
+  const end=Math.min(idx+maxC,c.length-1);
+  for(let j=idx+1;j<=end;j++){
+    const h=hi[j],l=lo[j];
+    if(dir==='long'){if(l<=sl){result='loss';exitPrice=sl;exitC=j-idx;break;}if(h>=tp){result='win';exitPrice=tp;exitC=j-idx;break;}}
+    else{if(h>=sl){result='loss';exitPrice=sl;exitC=j-idx;break;}if(l<=tp){result='win';exitPrice=tp;exitC=j-idx;break;}}
+  }
+  const pnl=result==='win'?rew:result==='loss'?-risk:0;
+  return{sl,tp,slPct,tpPct,sz,rew,risk,result,exitPrice,exitC,pnl};
+}
+
+async function fetchAPI(path){
+  for(const base of BASES){try{const r=await fetch(`${base}${path}`,{method:'GET',headers:{'Accept':'application/json'},mode:'cors'});if(!r.ok)continue;return await r.json();}catch(e){}}
+  throw new Error('API failed');
+}
+
+async function getSymbols(n){
+  const d=await fetchAPI('/v5/market/tickers?category=linear');
+  return d.result.list.filter(t=>t.symbol.endsWith('USDT')&&parseFloat(t.turnover24h)>0).sort((a,b)=>parseFloat(b.turnover24h)-parseFloat(a.turnover24h)).slice(0,n).map(t=>t.symbol);
+}
+
+async function getHTF(sym,interval,fromTs,toTs){
+  const ims=interval==='240'?4*3600000:3600000,warmup=200*ims;
+  let all=[],end=toTs;
+  while(true){
+    const d=await fetchAPI(`/v5/market/kline?category=linear&symbol=${sym}&interval=${interval}&limit=1000&end=${end}`);
+    const list=d?.result?.list;if(!list||!list.length)break;
+    all=[...[...list].reverse(),...all];
+    const oldest=parseInt(list[list.length-1][0]);
+    if(oldest<=fromTs-warmup)break;
+    end=oldest-1;await new Promise(r=>setTimeout(r,80));
+  }
+  return all;
+}
+
+async function get15m(sym,fromTs,toTs){
+  const warmup=200*15*60000;
+  let all=[],end=toTs;
+  while(true){
+    const d=await fetchAPI(`/v5/market/kline?category=linear&symbol=${sym}&interval=15&limit=1000&end=${end}`);
+    const list=d?.result?.list;if(!list||!list.length)break;
+    all=[...[...list].reverse(),...all];
+    const oldest=parseInt(list[list.length-1][0]);
+    if(oldest<=fromTs-warmup)break;
+    end=oldest-1;await new Promise(r=>setTimeout(r,80));
+  }
+  return all.filter(r=>parseInt(r[0])<=toTs);
+}
+
+function fmt(p){
+  if(p===undefined||p===null)return'—';
+  const a=Math.abs(p);
+  if(a<0.001)return p.toFixed(6);if(a<1)return p.toFixed(4);if(a<100)return p.toFixed(3);
+  return p.toLocaleString(undefined,{maximumFractionDigits:2});
+}
+
+async function runBacktest(){
+  if(running)return;running=true;
+  const fromDate=document.getElementById('date-from').value;
+  const toDate=document.getElementById('date-to').value;
+  const topN=parseInt(document.getElementById('top-n').value);
+  const capital=parseFloat(document.getElementById('capital').value)||100;
+  const risk=parseFloat(document.getElementById('risk-usd').value)||2;
+  const tpRR=parseFloat(document.getElementById('tp-rr').value)||1.5;
+  const maxC=parseInt(document.getElementById('sim-candles').value)||96;
+  if(!fromDate||!toDate){alert('Select a date range!');running=false;return;}
+  const fromTs=new Date(fromDate).getTime(),toTs=new Date(toDate+'T23:59:59').getTime();
+  const days=Math.round((toTs-fromTs)/86400000);
+  const btn=document.getElementById('run-btn');
+  btn.disabled=true;btn.innerHTML='<span class="spin">↻</span> Running...';
+  allSignals=[];
+  document.getElementById('prog').style.width='2%';
+  document.getElementById('status').innerHTML=`Fetching top ${topN} symbols...`;
+  document.getElementById('sim-section').style.display='none';
+  updateSummary();
+  try{
+    const symbols=await getSymbols(topN);let done=0;
+    for(const sym of symbols){
+      document.getElementById('status').innerHTML=`<strong>${sym}</strong> (${done+1}/${symbols.length}) — fetching 4H · 1H · 15m history...`;
+      try{
+        const [r4h,r1h,r15]=await Promise.all([getHTF(sym,'240',fromTs,toTs),getHTF(sym,'60',fromTs,toTs),get15m(sym,fromTs,toTs)]);
+        if(!r4h.length||!r1h.length||!r15.length){done++;continue;}
+        const c4=r4h.map(r=>parseFloat(r[4])),t4=r4h.map(r=>parseInt(r[0]));
+        const c1=r1h.map(r=>parseFloat(r[4])),t1=r1h.map(r=>parseInt(r[0]));
+        const c15=r15.map(r=>parseFloat(r[4])),hi15=r15.map(r=>parseFloat(r[2])),lo15=r15.map(r=>parseFloat(r[3])),ts15=r15.map(r=>parseInt(r[0]));
+        const startI=ts15.findIndex(t=>t>=fromTs);
+        if(startI<110){done++;continue;}
+        // Track open trade: null = no open trade, otherwise = exit candle index
+        let openTradeExitIdx = -1;
+
+        for(let i=Math.max(110,startI);i<c15.length;i++){
+          if(ts15[i]>toTs)break;
+
+          // Skip if there is still an open trade that hasnt closed yet
+          if(openTradeExitIdx > 0 && i <= openTradeExitIdx) continue;
+
+          const curTs=ts15[i];
+          const i4=t4.findLastIndex(t=>t<=curTs),i1=t1.findLastIndex(t=>t<=curTs);
+          if(i4<110||i1<110)continue;
+          const tr4=trendAt(c4,i4),tr1=trendAt(c1,i1);
+          if(tr4==='chop'||tr4==='unknown'||tr1==='chop'||tr1==='unknown'||tr4!==tr1)continue;
+          const dir=tr4==='uptrend'?'long':'short';
+          const ent=entryAt(c15,i,dir);if(!ent)continue;
+
+          const price=c15[i];
+          const sim=simulate(c15,hi15,lo15,i,ent,dir,risk,tpRR,maxC);
+
+          // Mark the exit candle so we dont enter same symbol again until closed
+          if(sim.result !== 'open') {
+            openTradeExitIdx = i + sim.exitC;
+          } else {
+            // Trade never closed — block for maxC candles
+            openTradeExitIdx = i + maxC;
+          }
+
+          allSignals.push({
+            symbol:sym,direction:dir,level:ent.level,dist:ent.dist,price,ts:curTs,
+            ema20:ent.v20,ema50:ent.v50,ema100:ent.v100,...sim,
+            date:new Date(curTs).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'}),
+            time:new Date(curTs).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'}),
+          });
+        }
+      }catch(e){console.error(sym,e);}
+      done++;
+      document.getElementById('prog').style.width=Math.round(done/symbols.length*100)+'%';
+      updateSummary();renderTab(currentTab);
+      await new Promise(r=>setTimeout(r,150));
+    }
+    document.getElementById('sv-days').textContent=days;
+    document.getElementById('ss-days').textContent=`${fromDate} → ${toDate}`;
+    document.getElementById('status').innerHTML=`<span class="ok">✅ Done</span> — <strong>${allSignals.length} signals</strong> over ${days} days across ${symbols.length} symbols.`;
+    updateSummary();updateSim(capital,risk);renderTab(currentTab);
+  }catch(e){document.getElementById('status').innerHTML=`Error: ${e.message}`;}
+  btn.disabled=false;btn.innerHTML='▶ Run Backtest';running=false;
+}
+
+function updateSummary(){
+  const l=allSignals.filter(s=>s.direction==='long').length;
+  const s=allSignals.filter(s=>s.direction==='short').length;
+  const sy=new Set(allSignals.map(s=>s.symbol)).size;
+  const g=allSignals.filter(s=>s.level==='green').length;
+  const y=allSignals.filter(s=>s.level==='yellow').length;
+  const r=allSignals.filter(s=>s.level==='red').length;
+  document.getElementById('sv-total').textContent=allSignals.length||'0';
+  document.getElementById('sv-long').textContent=l||'0';
+  document.getElementById('sv-short').textContent=s||'0';
+  document.getElementById('sv-syms').textContent=sy||'0';
+  document.getElementById('sv-g').textContent=g||'0';
+  document.getElementById('sv-y').textContent=y||'0';
+  document.getElementById('sv-r').textContent=r||'0';
+  document.getElementById('ss-total').textContent=allSignals.length?`${l}L / ${s}S`:'awaiting scan';
+  document.getElementById('ss-syms').textContent=sy?`out of ${document.getElementById('top-n').value} scanned`:'unique tokens';
+}
+
+function updateSim(startCap,risk){
+  const closed=allSignals.filter(s=>s.result!=='open');
+  if(!closed.length)return;
+  const wins=closed.filter(s=>s.result==='win').length;
+  const losses=closed.filter(s=>s.result==='loss').length;
+  const wr=(wins/closed.length*100).toFixed(1);
+  const net=closed.reduce((s,t)=>s+t.pnl,0);
+  const final=startCap+net;
+  const avg=net/closed.length;
+  const pnlEl=document.getElementById('sv-pnl');
+  pnlEl.textContent=`${net>=0?'+':''}$${Math.abs(net).toFixed(2)}`;
+  pnlEl.className=`sv ${net>=0?'cl':'cs'}`;
+  const avgEl=document.getElementById('sv-avg');
+  avgEl.textContent=`${avg>=0?'+':''}$${Math.abs(avg).toFixed(2)}`;
+  avgEl.className=`sv ${avg>=0?'cl':'cs'}`;
+  document.getElementById('sv-winrate').textContent=`${wr}%`;
+  document.getElementById('ss-winrate').textContent=`${wins}W / ${losses}L`;
+  document.getElementById('sv-capital').textContent=`$${final.toFixed(2)}`;
+  document.getElementById('ss-capital').textContent=`started: $${startCap}`;
+  document.getElementById('ss-pnl').textContent=`${wins} wins · ${losses} losses`;
+  document.getElementById('ss-avg').textContent=`${closed.length} closed trades`;
+  document.getElementById('sim-section').style.display='block';
+  drawEquity(startCap,closed);
+}
+
+function drawEquity(start,trades){
+  const canvas=document.getElementById('eq-canvas');
+  const ctx=canvas.getContext('2d');
+  canvas.width=canvas.offsetWidth||900;canvas.height=140;
+  const pts=[start];let run=start;
+  trades.forEach(t=>{run+=t.pnl;pts.push(run);});
+  const min=Math.min(...pts)*0.995,max=Math.max(...pts)*1.005;
+  const W=canvas.width,H=canvas.height;
+  const tx=i=>(i/(pts.length-1))*W,ty=v=>H-((v-min)/(max-min))*H;
+  ctx.clearRect(0,0,W,H);
+  const ec=pts[pts.length-1]>=start?'#00e5a0':'#ff4560';
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,ec+'44');grad.addColorStop(1,ec+'00');
+  ctx.beginPath();ctx.moveTo(tx(0),ty(pts[0]));
+  pts.forEach((p,i)=>ctx.lineTo(tx(i),ty(p)));
+  ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();
+  ctx.fillStyle=grad;ctx.fill();
+  ctx.beginPath();ctx.moveTo(tx(0),ty(pts[0]));
+  pts.forEach((p,i)=>ctx.lineTo(tx(i),ty(p)));
+  ctx.strokeStyle=ec;ctx.lineWidth=2;ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,ty(start));ctx.lineTo(W,ty(start));
+  ctx.strokeStyle='#243044';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.stroke();ctx.setLineDash([]);
+}
+
+function switchTab(tab,el){
+  currentTab=tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');renderTab(tab);
+}
+
+function renderTab(tab){
+  const area=document.getElementById('results-area');
+  if(!allSignals.length){
+    area.innerHTML=`<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">No signals found</div><div class="empty-sub">Try a wider date range or more symbols.</div></div>`;
+    return;
+  }
+  if(tab==='symbols'){renderBySymbol(area);return;}
+  let sigs=allSignals;
+  if(tab==='long')sigs=sigs.filter(s=>s.direction==='long');
+  if(tab==='short')sigs=sigs.filter(s=>s.direction==='short');
+  if(!sigs.length){area.innerHTML=`<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No signals for this filter</div></div>`;return;}
+  const ll={green:'🟢 EMA20',yellow:'🟡 EMA50',red:'🔴 EMA100'};
+  area.innerHTML=`<div class="tw"><table>
+    <thead><tr><th>Symbol</th><th>Date</th><th>Time</th><th>Dir</th><th>Level</th><th>Entry</th><th>Stop</th><th>Target</th><th>Size</th><th>Result</th><th>P&L</th></tr></thead>
+    <tbody>${sigs.slice(0,300).map(s=>`
+      <tr class="${s.result==='win'?'wr':s.result==='loss'?'lr':''}">
+        <td><span class="sym">${s.symbol.replace('USDT','')}</span></td>
+        <td style="color:var(--muted)">${s.date}</td>
+        <td style="color:var(--muted)">${s.time}</td>
+        <td><span class="badge ${s.direction==='long'?'bdl':'bds'}">${s.direction==='long'?'▲ L':'▼ S'}</span></td>
+        <td><span class="badge ${s.level==='green'?'bg':s.level==='yellow'?'by':'br'}">${ll[s.level]}</span></td>
+        <td>$${fmt(s.price)}</td>
+        <td class="pn">$${fmt(s.sl)}</td>
+        <td class="pp">$${fmt(s.tp)}</td>
+        <td style="color:var(--muted)">$${s.sz||'—'}</td>
+        <td><span class="badge ${s.result==='win'?'bw':s.result==='loss'?'bl':'bo'}">${s.result==='win'?'✅ WIN':s.result==='loss'?'❌ LOSS':'⏳ OPEN'}</span></td>
+        <td class="${s.pnl>0?'pp':s.pnl<0?'pn':''}">${s.pnl!==0?(s.pnl>0?'+':'')+`$${Math.abs(s.pnl).toFixed(2)}`:'—'}</td>
+      </tr>`).join('')}
+    </tbody></table></div>
+  ${sigs.length>300?`<div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;padding:10px;">Showing 300 of ${sigs.length}</div>`:''}`;
+}
+
+function buildSymbolMap() {
+  const m = {};
+  allSignals.forEach(s => {
+    if (!m[s.symbol]) m[s.symbol] = {long:0,short:0,green:0,yellow:0,red:0,total:0,wins:0,losses:0,open:0,pnl:0,signals:[]};
+    m[s.symbol][s.direction]++;
+    m[s.symbol][s.level]++;
+    m[s.symbol].total++;
+    m[s.symbol].signals.push(s);
+    if (s.result==='win')  { m[s.symbol].wins++;  m[s.symbol].pnl += s.pnl; }
+    if (s.result==='loss') { m[s.symbol].losses++; m[s.symbol].pnl += s.pnl; }
+    if (s.result==='open') { m[s.symbol].open++; }
+  });
+  return m;
+}
+
+let selectedSymbol = null;
+
+function renderBySymbol(area) {
+  const m = buildSymbolMap();
+  const sorted = Object.entries(m).sort((a,b) => b[1].total - a[1].total);
+  if (!selectedSymbol || !m[selectedSymbol]) selectedSymbol = sorted[0]?.[0] || null;
+
+  const listHTML = sorted.map(([sym, d]) => {
+    const closed = d.wins + d.losses;
+    const wr = closed ? (d.wins/closed*100).toFixed(0)+'%' : '—';
+    const wrColor = d.pnl >= 0 ? 'var(--long)' : 'var(--short)';
+    return `<div class="token-item ${sym === selectedSymbol ? 'active' : ''}" id="ti-${sym}" onclick="selectToken('${sym}')">
+      <div>
+        <div class="token-item-name">${sym.replace('USDT','')}</div>
+        <div class="token-item-sub">${d.total} signals · ${d.long}L ${d.short}S</div>
+      </div>
+      <div class="token-item-wr" style="color:${wrColor}">${wr}</div>
+    </div>`;
+  }).join('');
+
+  area.innerHTML = `<div class="token-browser">
+    <div class="token-list">
+      <div class="token-list-header">Tokens (${sorted.length})</div>
+      <div class="token-list-search"><input type="text" id="tok-search" placeholder="Search token..." oninput="filterTokenList()"></div>
+      <div class="token-scroll" id="token-scroll">${listHTML}</div>
+    </div>
+    <div class="token-detail" id="token-detail">
+      ${selectedSymbol ? renderTokenDetail(selectedSymbol, m[selectedSymbol]) : '<div class="empty"><div class="empty-icon">👆</div><div class="empty-title">Select a token</div></div>'}
+    </div>
+  </div>`;
+
+  if (selectedSymbol && m[selectedSymbol]) drawTokenEquity(selectedSymbol, m[selectedSymbol]);
+}
+
+function filterTokenList() {
+  const q = document.getElementById('tok-search').value.toLowerCase();
+  document.querySelectorAll('.token-item').forEach(el => {
+    el.style.display = el.querySelector('.token-item-name').textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+function selectToken(sym) {
+  selectedSymbol = sym;
+  document.querySelectorAll('.token-item').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById('ti-'+sym);
+  if (el) { el.classList.add('active'); el.scrollIntoView({block:'nearest'}); }
+  const m = buildSymbolMap();
+  document.getElementById('token-detail').innerHTML = renderTokenDetail(sym, m[sym]);
+  drawTokenEquity(sym, m[sym]);
+}
+
+function renderTokenDetail(sym, d) {
+  const closed = d.wins + d.losses;
+  const wr = closed ? (d.wins/closed*100).toFixed(1)+'%' : '—';
+  const wrColor = d.pnl >= 0 ? 'var(--long)' : 'var(--short)';
+  const ll = {green:'🟢 EMA20', yellow:'🟡 EMA50', red:'🔴 EMA100'};
+  const avgWin  = d.wins   ? (d.signals.filter(s=>s.result==='win').reduce((a,s)=>a+s.pnl,0)  / d.wins).toFixed(2)   : '—';
+  const avgLoss = d.losses ? (d.signals.filter(s=>s.result==='loss').reduce((a,s)=>a+s.pnl,0) / d.losses).toFixed(2) : '—';
+
+  return `
+    <div class="token-detail-header">
+      <div>
+        <div class="token-detail-name">${sym.replace('USDT','')}<span style="font-size:13px;color:var(--muted);font-weight:400;">/USDT</span></div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;">${d.total} signals &nbsp;·&nbsp; ${d.long} longs &nbsp;·&nbsp; ${d.short} shorts</div>
+      </div>
+      <div style="text-align:right;font-family:var(--mono);">
+        <div style="font-size:22px;font-weight:700;color:${wrColor}">${wr}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;">win rate</div>
+      </div>
+    </div>
+
+    <div class="token-detail-stats">
+      <div class="tds">
+        <div class="tds-label">Net P&L</div>
+        <div class="tds-value" style="color:${d.pnl>=0?'var(--long)':'var(--short)'}">${d.pnl>=0?'+':''}$${Math.abs(d.pnl).toFixed(2)}</div>
+      </div>
+      <div class="tds">
+        <div class="tds-label">W / L</div>
+        <div class="tds-value"><span style="color:var(--long)">${d.wins}W</span> <span style="color:var(--muted)">/</span> <span style="color:var(--short)">${d.losses}L</span></div>
+      </div>
+      <div class="tds">
+        <div class="tds-label">Avg Win</div>
+        <div class="tds-value" style="color:var(--long);font-size:14px;">+$${avgWin}</div>
+      </div>
+      <div class="tds">
+        <div class="tds-label">Avg Loss</div>
+        <div class="tds-value" style="color:var(--short);font-size:14px;">$${avgLoss}</div>
+      </div>
+      <div class="tds">
+        <div class="tds-label">🟢 EMA20</div>
+        <div class="tds-value" style="color:var(--long)">${d.green}</div>
+      </div>
+      <div class="tds">
+        <div class="tds-label">🟡 EMA50</div>
+        <div class="tds-value" style="color:var(--warn)">${d.yellow}</div>
+      </div>
+      <div class="tds">
+        <div class="tds-label">🔴 EMA100</div>
+        <div class="tds-value" style="color:var(--short)">${d.red}</div>
+      </div>
+      <div class="tds">
+        <div class="tds-label">Open</div>
+        <div class="tds-value" style="color:var(--warn)">${d.open}</div>
+      </div>
+    </div>
+
+    <canvas class="token-equity" id="teq-${sym}"></canvas>
+
+    <div class="tw"><table>
+      <thead><tr><th>Date</th><th>Time</th><th>Dir</th><th>Level</th><th>Entry</th><th>Stop</th><th>Target</th><th>Result</th><th>P&L</th></tr></thead>
+      <tbody>${d.signals.map(s => `
+        <tr class="${s.result==='win'?'wr':s.result==='loss'?'lr':''}">
+          <td style="color:var(--muted)">${s.date}</td>
+          <td style="color:var(--muted)">${s.time}</td>
+          <td><span class="badge ${s.direction==='long'?'bdl':'bds'}">${s.direction==='long'?'▲ L':'▼ S'}</span></td>
+          <td><span class="badge ${s.level==='green'?'bg':s.level==='yellow'?'by':'br'}">${ll[s.level]}</span></td>
+          <td>$${fmt(s.price)}</td>
+          <td class="pn">$${fmt(s.sl)}</td>
+          <td class="pp">$${fmt(s.tp)}</td>
+          <td><span class="badge ${s.result==='win'?'bw':s.result==='loss'?'bl':'bo'}">${s.result==='win'?'✅ WIN':s.result==='loss'?'❌ LOSS':'⏳ OPEN'}</span></td>
+          <td class="${s.pnl>0?'pp':s.pnl<0?'pn':''}">${s.pnl!==0?(s.pnl>0?'+':'')+`$${Math.abs(s.pnl).toFixed(2)}`:'—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+function drawTokenEquity(sym, d) {
+  setTimeout(() => {
+    const canvas = document.getElementById('teq-'+sym);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth || 600;
+    canvas.height = 100;
+    const closed = d.signals.filter(s => s.result !== 'open');
+    if (!closed.length) return;
+    const startCap = parseFloat(document.getElementById('capital').value) || 100;
+    const pts = [startCap];
+    let run = startCap;
+    closed.forEach(t => { run += t.pnl; pts.push(run); });
+    const min = Math.min(...pts)*0.99, max = Math.max(...pts)*1.01;
+    const W = canvas.width, H = canvas.height;
+    const tx = i => (i/(pts.length-1))*W, ty = v => H-((v-min)/(max-min))*H;
+    ctx.clearRect(0,0,W,H);
+    const ec = pts[pts.length-1] >= startCap ? '#00e5a0' : '#ff4560';
+    const grad = ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0,ec+'44'); grad.addColorStop(1,ec+'00');
+    ctx.beginPath(); ctx.moveTo(tx(0),ty(pts[0]));
+    pts.forEach((p,i)=>ctx.lineTo(tx(i),ty(p)));
+    ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
+    ctx.fillStyle=grad; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(tx(0),ty(pts[0]));
+    pts.forEach((p,i)=>ctx.lineTo(tx(i),ty(p)));
+    ctx.strokeStyle=ec; ctx.lineWidth=2; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,ty(startCap)); ctx.lineTo(W,ty(startCap));
+    ctx.strokeStyle='#243044'; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+  }, 50);
+}
+</script>
+</body>
+</html>
